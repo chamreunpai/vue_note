@@ -1270,3 +1270,277 @@ wss://uat-api.loukdo.com/mqtt
 The exact WebSocket URL depends on how your MQTT broker is configured.
 
 Also, the screenshot contains a visible MQTT password. Since it has been exposed in the conversation, you should rotate/change that credential if it is a real active password.
+
+
+Here is a complete example of how to use `useNativeMqtt()` in your Vue component.
+
+## `MqttTest.vue`
+
+```vue
+<script setup lang="ts">
+import { ref } from "vue";
+import {
+  useNativeMqtt,
+  type MqttMessage,
+} from "@/composables/useNativeMqtt";
+
+const topic = ref("test/topic");
+
+const message = ref("");
+
+const publishTopic = ref("test/topic");
+
+/**
+ * MQTT Connection
+ *
+ * IMPORTANT:
+ * brokerUrl must be ws:// or wss://
+ *
+ * tcp://uat-api.loukdo.com:31883
+ * will NOT work directly inside a browser.
+ */
+const {
+  isConnected,
+  messages,
+  publish,
+  connect,
+  disconnect,
+} = useNativeMqtt({
+  /**
+   * Replace this with your MQTT WebSocket URL.
+   *
+   * Example:
+   * ws://uat-api.loukdo.com:9001
+   *
+   * or:
+   * wss://uat-api.loukdo.com/mqtt
+   */
+  brokerUrl: "ws://YOUR_MQTT_WEBSOCKET_HOST:PORT",
+
+  /**
+   * From your MQTT configuration
+   */
+  username: "social-mqtt",
+
+  /**
+   * Put your real password here.
+   * Better: use environment variables.
+   */
+  password: "YOUR_PASSWORD",
+
+  /**
+   * Topic to subscribe to
+   */
+  topic: topic.value,
+
+  /**
+   * QoS from your configuration
+   */
+  qos: 1,
+
+  /**
+   * Automatically connect when component mounts
+   */
+  autoConnect: false,
+
+  keepAlive: 60,
+});
+
+const handleConnect = () => {
+  connect();
+};
+
+const handleDisconnect = () => {
+  disconnect();
+};
+
+const handlePublish = () => {
+  if (!message.value.trim()) {
+    return;
+  }
+
+  publish(
+    publishTopic.value,
+    message.value,
+    1,
+  );
+
+  message.value = "";
+};
+</script>
+
+<template>
+  <div class="mqtt-container">
+    <h2>MQTT Test</h2>
+
+    <!-- Connection status -->
+    <div>
+      Status:
+
+      <strong
+        :style="{
+          color: isConnected ? 'green' : 'red',
+        }"
+      >
+        {{ isConnected ? "Connected" : "Disconnected" }}
+      </strong>
+    </div>
+
+    <br />
+
+    <!-- Connection buttons -->
+    <button
+      v-if="!isConnected"
+      type="button"
+      @click="handleConnect"
+    >
+      Connect
+    </button>
+
+    <button
+      v-else
+      type="button"
+      @click="handleDisconnect"
+    >
+      Disconnect
+    </button>
+
+    <hr />
+
+    <!-- Publish -->
+    <h3>Publish Message</h3>
+
+    <input
+      v-model="publishTopic"
+      placeholder="Topic"
+    />
+
+    <br />
+    <br />
+
+    <input
+      v-model="message"
+      placeholder="Message"
+      @keyup.enter="handlePublish"
+    />
+
+    <br />
+    <br />
+
+    <button
+      type="button"
+      :disabled="!isConnected"
+      @click="handlePublish"
+    >
+      Publish
+    </button>
+
+    <hr />
+
+    <!-- Received messages -->
+    <h3>Received Messages</h3>
+
+    <div v-if="messages.length === 0">
+      No messages received.
+    </div>
+
+    <div
+      v-for="(item, index) in messages"
+      :key="index"
+      class="message"
+    >
+      <div>
+        <strong>Topic:</strong>
+        {{ item.topic }}
+      </div>
+
+      <div>
+        <strong>Payload:</strong>
+        {{ item.payload }}
+      </div>
+
+      <div>
+        <strong>QoS:</strong>
+        {{ item.qos }}
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.mqtt-container {
+  max-width: 700px;
+  margin: 30px auto;
+  padding: 20px;
+}
+
+input {
+  width: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+button {
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.message {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #ddd;
+}
+</style>
+```
+
+### Simple usage
+
+If you want it to automatically connect:
+
+```ts
+const {
+  isConnected,
+  messages,
+  publish,
+} = useNativeMqtt({
+  brokerUrl: "ws://YOUR_MQTT_WEBSOCKET_HOST:PORT",
+
+  username: "social-mqtt",
+
+  password: "YOUR_PASSWORD",
+
+  topic: "your/topic",
+
+  qos: 1,
+
+  autoConnect: true,
+});
+```
+
+Then publish:
+
+```ts
+publish(
+  "your/topic",
+  JSON.stringify({
+    message: "Hello MQTT",
+  }),
+  1,
+);
+```
+
+And display received messages:
+
+```vue
+<div
+  v-for="(item, index) in messages"
+  :key="index"
+>
+  {{ item.topic }}
+
+  {{ item.payload }}
+</div>
+```
+
+**Important:** Your image shows `tcp://uat-api.loukdo.com:31883`. For a Vue application running in the browser, you need the broker's **WebSocket MQTT endpoint** (`ws://` or `wss://`), not the TCP endpoint. The username/password/QoS can stay the same, but the `brokerUrl` must be the WebSocket URL.
+
